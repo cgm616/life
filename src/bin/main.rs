@@ -1,5 +1,5 @@
-use chips::{Algorithm, Anneal, ConwaysLife};
 use ::rand::{thread_rng, Fill};
+use chips::{Algorithm, Anneal, ConwaysLife};
 use macroquad::prelude::*;
 
 const HEIGHT: usize = 600;
@@ -22,10 +22,15 @@ async fn main() {
     let mut world1: [bool; HEIGHT * WIDTH] = [false; HEIGHT * WIDTH];
     let mut world2: [bool; HEIGHT * WIDTH] = [false; HEIGHT * WIDTH];
 
-    world1.try_fill(&mut rng).expect("could not init random state");
+    world1
+        .try_fill(&mut rng)
+        .expect("could not init random state");
 
     let (mut fresh, mut stale) = (&mut world1, &mut world2);
-    
+
+    let mut image = Image::gen_image_color(WIDTH as u16, HEIGHT as u16, BLACK);
+    let texture = Texture2D::from_image(&image);
+
     loop {
         clear_background(BLACK);
 
@@ -45,11 +50,14 @@ async fn main() {
         for i in 0..WIDTH {
             for j in 0..HEIGHT {
                 if fresh[i + (j * WIDTH)] {
-                    render_alive((i, j));
+                    image.set_pixel(i as u32, j as u32, WHITE);
+                } else {
+                    image.set_pixel(i as u32, j as u32, BLACK);
                 }
 
                 if simulate {
-                    stale[i + (j * WIDTH)] = Anneal::next_state((i, j).into(), fresh, (WIDTH, HEIGHT));
+                    stale[i + (j * WIDTH)] =
+                        Anneal::next_state((i, j).into(), fresh, (WIDTH, HEIGHT));
                 }
             }
         }
@@ -60,16 +68,9 @@ async fn main() {
             stale = temp;
         }
 
+        texture.update(&image);
+        draw_texture(texture, 0.0, 0.0, WHITE);
+
         next_frame().await
     }
-}
-
-fn render_alive(location: (usize, usize)) {
-    draw_line(location.0 as f32,
-              location.1 as f32,
-              location.0 as f32 + 1.0,
-              location.1 as f32 + 1.0,
-              1 as f32,
-              WHITE
-              );
 }
