@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     convert::TryFrom,
     iter::FromIterator,
     ops::{Deref, DerefMut},
@@ -30,6 +29,7 @@ impl From<(usize, usize)> for Cell {
 
 pub trait Automata {
     fn update<O: BitOrder, T: BitStore>(
+        &self,
         world: &BitSlice<O, T>,
         target: &mut BitSlice<O, T>,
         changes: &BitSlice<O, T>,
@@ -37,10 +37,65 @@ pub trait Automata {
     );
 }
 
-pub struct ConwaysLife;
+pub struct LifeLike {
+    rules: Box<[bool; 18]>,
+}
 
-impl Automata for ConwaysLife {
+impl LifeLike {
+    fn encode_index(status: bool, neighbors: usize) -> usize {
+        let lowest = status as usize;
+        lowest + ((neighbors & 0b1111) << 1)
+    }
+
+    fn decode_index(index: usize) -> (bool, usize) {
+        (index & 1 != 0, (index & 0b11110) >> 1)
+    }
+
+    pub fn new(def: &str) -> Result<Self, &'static str> {
+        if !def.is_ascii() {
+            return Err("definition string must be ascii");
+        }
+
+        let (mut b, mut s) = def
+            .split_once('/')
+            .ok_or("invalid definition string format")?;
+
+        b = b
+            .strip_prefix(|c| c == 'b' || c == 'B')
+            .ok_or("first part of def string must start with 'b'")?;
+        s = s
+            .strip_prefix(|c| c == 's' || c == 'S')
+            .ok_or("second part of def string must start with 's'")?;
+
+        let mut rules = [false; 18];
+
+        for c in b.chars() {
+            let neighbors = c
+                .to_digit(10)
+                .ok_or("could not parse numbers from definition string first part")?;
+            rules[Self::encode_index(false, neighbors as usize)] = true;
+        }
+
+        for c in s.chars() {
+            let neighbors = c
+                .to_digit(10)
+                .ok_or("could not parse numbers from definition string second part")?;
+            rules[Self::encode_index(true, neighbors as usize)] = true;
+        }
+
+        Ok(LifeLike {
+            rules: Box::new(rules),
+        })
+    }
+
+    pub fn simulate(&self, status: bool, neighbors: usize) -> bool {
+        self.rules[Self::encode_index(status, neighbors)]
+    }
+}
+
+impl Automata for LifeLike {
     fn update<O: BitOrder, T: BitStore>(
+        &self,
         world: &BitSlice<O, T>,
         target: &mut BitSlice<O, T>,
         changes: &BitSlice<O, T>,
@@ -48,7 +103,77 @@ impl Automata for ConwaysLife {
     ) {
         assert_eq!(world.len(), size.0 * size.1);
 
-        let mut extras = HashSet::new();
+        let mut extras = Vec::new();
+
+        for index in changes.iter_ones() {
+            let neighbor_indices = moore_neighborhood_wrapping(
+                Cell {
+                    x: index % size.0,
+                    y: index / size.0,
+                },
+                size,
+            );
+
+            let neighbors = neighbor_indices
+                .iter()
+                .map(|(x, y)| {
+                    let combined = x + (y * size.0);
+                    if !unsafe { *changes.get_unchecked(combined) } {
+                        extras.push(combined);
+                    }
+                    unsafe { *world.get_unchecked(combined) }
+                })
+                .filter(|&i| i)
+                .count();
+
+            let status = *world.get(index).as_deref().unwrap();
+
+            let next_status = self.simulate(status, neighbors);
+            target.set(index, next_status);
+        }
+
+        extras.sort_unstable();
+        extras.dedup();
+
+        for &index in extras.iter() {
+            let neighbor_indices = moore_neighborhood_wrapping(
+                Cell {
+                    x: index % size.0,
+                    y: index / size.0,
+                },
+                size,
+            );
+
+            let neighbors = neighbor_indices
+                .iter()
+                .map(|(x, y)| {
+                    let combined = x + (y * size.0);
+                    unsafe { *world.get_unchecked(combined) }
+                })
+                .filter(|&i| i)
+                .count();
+
+            let status = *world.get(index).as_deref().unwrap();
+
+            let next_status = self.simulate(status, neighbors);
+            target.set(index, next_status);
+        }
+    }
+}
+
+pub struct ConwaysLife;
+
+impl Automata for ConwaysLife {
+    fn update<O: BitOrder, T: BitStore>(
+        &self,
+        world: &BitSlice<O, T>,
+        target: &mut BitSlice<O, T>,
+        changes: &BitSlice<O, T>,
+        size: (usize, usize),
+    ) {
+        assert_eq!(world.len(), size.0 * size.1);
+
+        let mut extras = Vec::new();
 
         for index in changes.iter_ones() {
             let neighbor_indices = moore_neighborhood_wrapping(
@@ -65,7 +190,7 @@ impl Automata for ConwaysLife {
                 let combined = neighbor_index.0 + (neighbor_index.1 * size.0);
                 hood |= (unsafe { *world.get_unchecked(combined) } as u8) << i;
                 if !unsafe { *changes.get_unchecked(combined) } {
-                    extras.insert(combined);
+                    extras.push(combined);
                 }
             }
 
@@ -76,6 +201,9 @@ impl Automata for ConwaysLife {
             let next_status = ConwaysLife::simulate_with_lookup(own_status, hood);
             target.set(index, next_status);
         }
+
+        extras.sort_unstable();
+        extras.dedup();
 
         for &index in extras.iter() {
             let neighbor_indices = moore_neighborhood_wrapping(
@@ -367,6 +495,7 @@ mod test {
         );
     }
 
+    /*
     #[test]
     fn simple_conways() {
         let size = (4, 4);
@@ -381,6 +510,22 @@ mod test {
 
         assert_eq!(target, world);
     }
+    */
+
+    #[test]
+    fn conways_life_compiles() {
+        let life = LifeLike::new("B3/S23").unwrap();
+    }
+
+    #[quickcheck]
+    fn lifelike_matches_logic(hood: u8) -> bool {
+        let life = LifeLike::new("B3/S23").unwrap();
+        let hood: MooreNeighborhood = hood.into();
+        let neighbors = hood.count_ones() as usize;
+        let alive = ConwaysLife::simulate_with_logic(true, hood) == life.simulate(true, neighbors);
+        let dead = ConwaysLife::simulate_with_logic(false, hood) == life.simulate(false, neighbors);
+        alive && dead
+    }
 
     #[quickcheck]
     fn lookup_matches_logic(hood: u8) -> bool {
@@ -390,5 +535,11 @@ mod test {
         let dead = ConwaysLife::simulate_with_logic(false, hood)
             == ConwaysLife::simulate_with_lookup(false, hood);
         alive && dead
+    }
+
+    #[quickcheck]
+    fn lifelike_index_reversible(status: bool, neighbors: usize) -> bool {
+        (status, neighbors & 0b1111)
+            == LifeLike::decode_index(LifeLike::encode_index(status, neighbors))
     }
 }

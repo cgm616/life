@@ -1,11 +1,16 @@
-use chips::{Automata, ConwaysLife};
+use core::f32;
+
+use chips::{Automata, LifeLike};
 
 use ::rand::{thread_rng, Rng};
 use bitvec::prelude::*;
 use macroquad::prelude::*;
 
-const HEIGHT: usize = 600;
-const WIDTH: usize = 800;
+const HEIGHT: usize = 512;
+const WIDTH: usize = 1024;
+// const RESOLUTION: usize = 8;
+// const M_HEIGHT: usize = HEIGHT / RESOLUTION;
+// const M_WIDTH: usize = WIDTH / RESOLUTION;
 
 fn window_conf() -> Conf {
     Conf {
@@ -21,53 +26,55 @@ fn window_conf() -> Conf {
 async fn main() {
     let mut rng = thread_rng();
 
-    let mut world1: BitArr!(for HEIGHT * WIDTH) = bitarr![0; HEIGHT * WIDTH];
-    let mut world2: BitArr!(for HEIGHT * WIDTH) = bitarr![0; HEIGHT * WIDTH];
+    let height: usize = screen_height() as usize;
+    let width = screen_width() as usize;
+    let resolution = 8usize;
+    let grid_height = height / resolution;
+    let grid_width = width / resolution;
+
+    info!("screen size: {} x {}", width, height);
+    info!("grid size: {} x {}", grid_width, grid_height);
+
+    // let mut world1: BitArr!(for grid_height * grid_width) = bitarr![0; grid_height * grid_width];
+    // let mut world2: BitArr!(for grid_height * grid_width) = bitarr![0; grid_height * grid_width];
+
+    let mut world1: BitVec<Lsb0, usize> = BitVec::with_capacity(grid_width * grid_height);
+    let mut world2: BitVec<Lsb0, usize> = BitVec::with_capacity(grid_width * grid_height);
+    let mut changes: BitVec<Lsb0, usize> = BitVec::with_capacity(grid_width * grid_height);
+    world1.resize(grid_width * grid_height, false);
+    world2.resize(grid_width * grid_height, false);
+    changes.resize(grid_width * grid_height, false);
 
     fill_random(&mut world1, &mut rng);
 
     let (mut fresh, mut stale) = (&mut world1, &mut world2);
 
-    let mut image = Image::gen_image_color(WIDTH as u16, HEIGHT as u16, BLACK);
-    let texture = Texture2D::from_image(&image);
+    // let mut image = Image::gen_image_color(width as u16, height as u16, BLACK);
+    // let texture = Texture2D::from_image(&image);
 
-    let mut counter = 0u16;
+    let life = LifeLike::new("B3/S23").unwrap();
 
     loop {
         clear_background(BLACK);
-        counter += 1;
-
-        if counter == 20 {
-            counter = 0;
-            info!("current fps: {}", get_fps());
-        }
-
-        if is_mouse_button_down(MouseButton::Left) {
-            let (x, y) = mouse_position();
-            let (x, y) = (x as usize, y as usize);
-            fresh.set(x + (WIDTH * y), true);
-            println!("mouse pressed at {:?}", (x, y));
-        }
-
-        let simulate = !is_key_down(KeyCode::Space);
 
         if is_key_released(KeyCode::Enter) {
             fill_random(fresh, &mut rng);
         }
 
-        let changes = *fresh ^ *stale;
+        changes.clear();
+        changes.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
 
-        render_bits(fresh, &changes, &mut image);
+        render_bits(fresh, &changes, (grid_width, grid_height, resolution));
 
-        if simulate {
-            ConwaysLife::update(fresh, stale, &changes, (WIDTH, HEIGHT));
+        if !is_key_down(KeyCode::Space) || is_key_released(KeyCode::Right) {
+            life.update(fresh, stale, &changes, (grid_width, grid_height));
             let temp = fresh;
             fresh = stale;
             stale = temp;
         }
 
-        texture.update(&image);
-        draw_texture(texture, 0.0, 0.0, WHITE);
+        // texture.update(&image);
+        // draw_texture(texture, 0.0, 0.0, WHITE);
 
         next_frame().await
     }
@@ -80,13 +87,24 @@ fn fill_random<O: BitOrder, T: BitStore>(slice: &mut BitSlice<O, T>, rng: &mut i
 fn render_bits<O: BitOrder, T: BitStore>(
     bits: &BitSlice<O, T>,
     changes: &BitSlice<O, T>,
-    image: &mut Image,
+    window_info: (usize, usize, usize),
 ) {
-    for index in changes.iter_ones() {
-        image.set_pixel(
-            (index % image.width()) as u32,
-            (index / image.width()) as u32,
+    for index in bits.iter_ones() {
+        /* image.set_pixel(
+            ((index % M_WIDTH) * RESOLUTION) as u32,
+            ((index / M_WIDTH) * RESOLUTION) as u32,
             if bits[index] { WHITE } else { BLACK },
+        );*/
+        let upper_left = (
+            (index % window_info.0) * window_info.2,
+            (index / window_info.0) * window_info.2,
+        );
+        draw_rectangle(
+            upper_left.0 as f32,
+            upper_left.1 as f32,
+            window_info.2 as f32,
+            window_info.2 as f32,
+            WHITE,
         );
     }
 }
