@@ -13,8 +13,7 @@ macroquad = { version = "0.3.6", features = ["log-impl"] }
 rand = "0.8.4"
 
 [dev-dependencies]
-quickcheck = "1.0.3"
-quickcheck_macros = "1.0.0"
+proptest = "1.0.0"
 
 [profile.release]
 debug = true
