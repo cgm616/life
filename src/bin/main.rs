@@ -2,7 +2,7 @@
 
 use core::f32;
 
-use chips::{Automata, LifeLike};
+use life::{Automata, LifeLike};
 
 use ::rand::{thread_rng, Rng};
 use bitvec::prelude::*;

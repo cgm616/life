@@ -1,5 +1,5 @@
 [package]
-name = "chips"
+name = "life"
 version = "0.1.0"
 authors = ["cgm616 <cgm616@me.com>"]
 edition = "2018"
@@ -13,8 +13,17 @@ macroquad = { version = "0.3.6", features = ["log-impl"] }
 rand = "0.8.4"
 
 [dev-dependencies]
+criterion = { version = "0.3.4", features = ["html_reports"] }
 proptest = "1.0.0"
 
 [profile.release]
 lto = true
 opt-level = 's'
+
+[[bench]]
+name = "life_like"
+harness = false
+
+[[bench]]
+name = "logic_vs_lookup"
+harness = false
