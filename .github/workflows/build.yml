@@ -24,11 +24,6 @@ jobs:
         components: rustfmt, clippy
     - name: Install linux build deps
       run: sudo apt-get install libasound2-dev xorg-dev libgl1-mesa-glx
-    - name: Rustfmt
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all -- --check
     - name: Install sccache (ubuntu-latest)
       env:
         LINK: https://github.com/mozilla/sccache/releases/download
@@ -58,6 +53,11 @@ jobs:
         restore-keys: |
           ubuntu-latest-sccache-
     - run: sccache --start-server
+    - name: Rustfmt
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all -- --check
     - name: Run clippy
       uses: actions-rs/cargo@v1
       with:
