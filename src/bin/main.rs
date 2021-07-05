@@ -88,7 +88,7 @@ enum State {
 
 impl State {
     fn next(&self, input: KeyCode, touches: Vec<Touch>) -> State {
-        match (self, input, touches.len() > 0) {
+        match (self, input, !touches.is_empty()) {
             (State::Normal | State::Paused, KeyCode::Escape, _) => State::Settings,
             (State::Normal, KeyCode::Space, _) | (State::Normal, _, true) => State::Paused,
             (State::Settings, KeyCode::Escape, _) => State::Normal,
