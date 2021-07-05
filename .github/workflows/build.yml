@@ -6,9 +6,6 @@ on:
       master
 
 jobs:
-  strategy:
-    max-parallel: 1
-  
   setup:
     runs-on: ubuntu-latest
 
@@ -28,6 +25,7 @@ jobs:
 
   fmt:
     runs-on: ubuntu-latest
+    needs: setup
 
     steps:
     - name: Rustfmt
@@ -55,6 +53,7 @@ jobs:
         echo "`pwd`/binaryen-1.39.1" > $GITHUB_PATH
   
   test:
+    needs: [setup, install-deps]
     runs-on: ubuntu-latest
     
     steps:
@@ -75,6 +74,7 @@ jobs:
         command: test
     
   build:
+    needs: [setup, install-deps]
     runs-on: ubuntu-latest
 
     steps:
@@ -83,6 +83,7 @@ jobs:
         ./build_wasm.sh main --release
 
   deploy:
+    needs: [setup, install-deps, build]
     runs-on: ubuntu-latest
 
     steps:
