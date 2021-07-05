@@ -44,6 +44,11 @@ jobs:
       with:
         command: test
 
+    - name: Run rustfmt
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt -- --check
+
     - name: Build and run wasm-bindgen
       run: |
         ./build_wasm.sh main --release
