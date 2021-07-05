@@ -49,7 +49,7 @@ async fn main() {
     // let mut image = Image::gen_image_color(width as u16, height as u16, BLACK);
     // let texture = Texture2D::from_image(&image);
 
-    let life = LifeLike::new("B3/S23").unwrap();
+    let life = LifeLike::new("B4678/S35678").unwrap();
 
     loop {
         clear_background(BLACK);
