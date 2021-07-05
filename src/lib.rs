@@ -78,7 +78,8 @@ impl Automata for LifeLike {
     ) {
         assert_eq!(world.len(), size.0 * size.1);
 
-        let mut extras = Vec::new();
+        let mut extras: BitVec<Lsb0, usize> = BitVec::with_capacity(size.0 * size.1);
+        extras.resize(size.0 * size.1, false);
 
         for index in changes.iter_ones() {
             let neighbor_indices =
@@ -89,7 +90,7 @@ impl Automata for LifeLike {
                 .map(|(x, y)| {
                     let combined = x + (y * size.0);
                     if !unsafe { *changes.get_unchecked(combined) } {
-                        extras.push(combined);
+                        extras.set(combined, true);
                     }
                     unsafe { *world.get_unchecked(combined) }
                 })
@@ -102,10 +103,7 @@ impl Automata for LifeLike {
             target.set(index, next_status);
         }
 
-        extras.sort_unstable();
-        extras.dedup();
-
-        for &index in extras.iter() {
+        for index in extras.iter_ones() {
             let neighbor_indices =
                 moore_neighborhood_wrapping((index % size.0, index / size.0), size);
 
