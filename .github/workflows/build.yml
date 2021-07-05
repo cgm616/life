@@ -155,7 +155,7 @@ jobs:
           ubuntu-latest-sccache-
     - run: sccache --start-server
     - name: Build and run wasm-bindgen
-      run: ./build_wasm.sh main --release
+      run: ./build_wasm.sh main --release --minify
     - run: sccache --show-stats
     - run: sccache --stop-server || true
     - name: Deploy

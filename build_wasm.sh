@@ -3,7 +3,7 @@
 set -e
 
 HELP_STRING=$(cat <<- END
-	usage: build_wasm.sh PROJECT_NAME [--release]
+	usage: build_wasm.sh PROJECT_NAME [--release] [--minify]
 
 	Build script for combining a Macroquad project with wasm-bindgen,
 	allowing integration with the greater wasm-ecosystem.
@@ -24,6 +24,7 @@ HELP_STRING=$(cat <<- END
 	Arguments:
 
 	    --release               Build in release mode
+	    --minify                Run wasm-opt to minify module
 
 
 	Author: Tom Solberg <me@sbg.dev>
@@ -33,7 +34,7 @@ END
 
 
 die () {
-    echo >&2 "usage: build_wasm.sh PROJECT_NAME [--release]"
+    echo >&2 "usage: build_wasm.sh PROJECT_NAME [--release] [--minify]"
     echo >&2 "Error: $@"
     echo >&2
     exit 1
@@ -42,6 +43,7 @@ die () {
 
 # Storage
 RELEASE=no
+MINIFY=no
 POSITIONAL=()
 
 # Parse primary commands
@@ -51,6 +53,11 @@ do
     case $key in
         --release)
             RELEASE=yes
+            shift
+            ;;
+        
+        --minify)
+            MINIFY=yes
             shift
             ;;
 
@@ -82,13 +89,18 @@ fi
 cargo build --target wasm32-unknown-unknown $EXTRA_ARGS
 
 # Generate bindgen outputs
+echo "Running wasm-bindgen..."
 mkdir -p web/wbindgen
 wasm-bindgen --target web --out-dir web/wbindgen/ target/wasm32-unknown-unknown/release/$PROJECT_NAME.wasm
 
 # Optimize for size
-wasm-opt -Os -o web/wbindgen/main_bg.wasm web/wbindgen/main_bg.wasm
+if [ "$MINIFY" == "yes" ]; then
+    echo "Running wasm-opt..."
+    wasm-opt -Os -o web/wbindgen/main_bg.wasm web/wbindgen/main_bg.wasm
+fi
 
 # Shims to tie it all together
+echo "Finishing up..."
 if type "gsed" > /dev/null; then
     gsed -i "s/import \* as __wbg_star0 from 'env';//" ./web/wbindgen/$PROJECT_NAME.js
     gsed -i "s/let wasm;/let wasm; export const set_wasm = (w) => wasm = w;/" ./web/wbindgen/$PROJECT_NAME.js
