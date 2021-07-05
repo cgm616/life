@@ -25,6 +25,13 @@ fn criterion_benchmark(c: &mut Criterion) {
                 fresh.iter_mut().for_each(|i| i.set(rng.gen()));
                 for _ in 0..black_box(5) {
                     change_buffer.clear();
+                    /*change_buffer.extend(
+                        fresh
+                            .as_raw_slice()
+                            .iter()
+                            .zip(stale.as_raw_slice().iter())
+                            .map(|(&a, &b)| a ^ b),
+                    );*/
                     change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
                     machine.update(fresh, stale, &change_buffer, (size, size));
                     std::mem::swap(fresh, stale);

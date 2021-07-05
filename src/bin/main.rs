@@ -230,16 +230,22 @@ async fn main() {
     }
 }
 
-fn simulate_step<O: BitOrder, T: BitStore>(
-    fresh: &BitSlice<O, T>,
-    stale: &mut BitSlice<O, T>,
-    change_buffer: &mut BitVec<O, T>,
+fn simulate_step<O: BitOrder>(
+    fresh: &BitSlice<O, usize>,
+    stale: &mut BitSlice<O, usize>,
+    change_buffer: &mut BitVec<O, usize>,
     size: (usize, usize),
     machine: &LifeLike,
 ) {
     // empty the change buffer and fill it with the new changes
     change_buffer.clear();
-    change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
+    change_buffer.extend(
+        fresh
+            .as_raw_slice()
+            .iter()
+            .zip(stale.as_raw_slice().iter())
+            .map(|(&a, &b)| a ^ b),
+    );
 
     // run the simulation one step
     machine.update(fresh, stale, &change_buffer, size);
