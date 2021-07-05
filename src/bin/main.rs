@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::f32;
 
 use chips::{Automata, LifeLike};
@@ -6,7 +8,7 @@ use ::rand::{thread_rng, Rng};
 use bitvec::prelude::*;
 use macroquad::{
     prelude::*,
-    ui::{hash, root_ui, widgets, Skin},
+    ui::{hash, root_ui, widgets},
 };
 
 const HEIGHT: usize = 512;
