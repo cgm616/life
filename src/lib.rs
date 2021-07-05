@@ -219,6 +219,13 @@ mod test {
 
     proptest! {
         #[test]
+        fn pt_lifelike_compiles_valid_strings(rule in "B[0-8]{0,8}/S[0-8]{0,8}") {
+            prop_assert!(LifeLike::new(&rule).is_ok())
+        }
+    }
+
+    proptest! {
+        #[test]
         fn pt_lifelike_matches_logic(neighbors in 0usize..9) {
             let life = LifeLike::new("B3/S23").unwrap();
             let alive = ConwaysLife::simulate_with_logic(true, neighbors) == life.simulate(true, neighbors);

@@ -26,13 +26,40 @@ fn window_conf() -> Conf {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Speed {
+    Normal,
+    Overclocked(usize),
+    Underclocked(usize),
+}
+
+impl Speed {
+    fn new() -> Self {
+        Self::Normal
+    }
+
+    fn new_overclocked(speed: usize) -> Self {
+        if speed == 0 || speed == 1 {
+            Self::Normal
+        } else {
+            Self::Overclocked(speed)
+        }
+    }
+
+    fn new_underclocked(speed: usize) -> Self {
+        if speed == 0 || speed == 1 {
+            Self::Normal
+        } else {
+            Self::Underclocked(speed)
+        }
+    }
+}
+
 struct World {
     state: State,
     machine: LifeLike,
-    /// The speed of the simulation. Positive numbers mean that the simulation should
-    /// process multiple generations a frame and negative numbers mean that the simulation
-    /// should process a generation every couple of frames.
-    speed: isize,
+    speed: Speed,
+    counter: usize,
 }
 
 impl World {
@@ -40,7 +67,8 @@ impl World {
         World {
             state: State::Normal,
             machine: LifeLike::new(initial_rule).unwrap(),
-            speed: 1,
+            speed: Speed::new(),
+            counter: 0,
         }
     }
 
@@ -76,7 +104,7 @@ async fn main() {
 
     let height: usize = screen_height() as usize;
     let width = screen_width() as usize;
-    let resolution = 8usize;
+    let resolution = 2usize;
     let grid_height = height / resolution;
     let grid_width = width / resolution;
     let world_size = grid_height * grid_width;
@@ -90,12 +118,13 @@ async fn main() {
 
     fill_random(&mut buffer1, &mut rng);
 
-    let (mut fresh, mut stale) = (&mut buffer1, &mut buffer2);
+    let (mut fresh, mut stale) = (&mut *buffer1, &mut *buffer2);
 
     // let skin = make_skin();
 
     let mut world = World::new(INITIAL_RULE);
     let mut rule_input = INITIAL_RULE.to_owned();
+    let mut speed_input = "1".to_owned();
 
     loop {
         clear_background(BLACK); // clear all previous drawings
@@ -112,40 +141,59 @@ async fn main() {
 
         // proceed according to current state
         match world.state {
-            State::Normal => {
-                // empty the change buffer and fill it with the new changes
-                change_buffer.clear();
-                change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
-
-                // run the simulation one step
-                // TODO: implement speed
-                world
-                    .machine
-                    .update(fresh, stale, &change_buffer, (grid_width, grid_height));
-
-                // swap the references
-                std::mem::swap(&mut fresh, &mut stale);
-            }
+            State::Normal => match world.speed {
+                Speed::Normal => {
+                    simulate_step(
+                        fresh,
+                        stale,
+                        &mut change_buffer,
+                        (grid_width, grid_height),
+                        &world.machine,
+                    );
+                    std::mem::swap(&mut fresh, &mut stale);
+                }
+                Speed::Overclocked(speed) => {
+                    for _ in 0..speed {
+                        simulate_step(
+                            fresh,
+                            stale,
+                            &mut change_buffer,
+                            (grid_width, grid_height),
+                            &world.machine,
+                        );
+                        std::mem::swap(&mut fresh, &mut stale);
+                    }
+                }
+                Speed::Underclocked(speed) => {
+                    if world.counter == 0 {
+                        simulate_step(
+                            fresh,
+                            stale,
+                            &mut change_buffer,
+                            (grid_width, grid_height),
+                            &world.machine,
+                        );
+                        std::mem::swap(&mut fresh, &mut stale);
+                    }
+                    world.counter = (world.counter + 1) % speed;
+                }
+            },
             State::Paused => {
                 // if paused, don't do anything unless the right arrow key was pressed
                 if is_key_pressed(KeyCode::Right) {
-                    // empty the change buffer and fill it with the new changes
-                    change_buffer.clear();
-                    change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
-
-                    // run the simulation one step
-                    // TODO: implement speed
-                    world
-                        .machine
-                        .update(fresh, stale, &change_buffer, (grid_width, grid_height));
-
-                    // swap the references
+                    simulate_step(
+                        fresh,
+                        stale,
+                        &mut change_buffer,
+                        (grid_width, grid_height),
+                        &world.machine,
+                    );
                     std::mem::swap(&mut fresh, &mut stale);
                 }
             }
             State::Settings => {
                 //root_ui().push_skin(&skin);
-                widgets::Window::new(hash!(), vec2(20., 20.), vec2(300., 100.))
+                widgets::Window::new(hash!(), vec2(20., 20.), vec2(300., 110.))
                     .movable(true)
                     .label("Settings")
                     .ui(&mut root_ui(), |ui| {
@@ -156,6 +204,23 @@ async fn main() {
                                 Err(e) => error!("could not change rule! error:\n  {}", e),
                             }
                         }
+                        match ui.tabbar(
+                            hash!(),
+                            vec2(280., 20.),
+                            &["Normal", "Overclocked", "Underclocked"],
+                        ) {
+                            0 => world.speed = Speed::new(),
+                            1 => {
+                                world.speed =
+                                    Speed::new_overclocked(speed_input.parse().unwrap_or(1))
+                            }
+                            2 => {
+                                world.speed =
+                                    Speed::new_underclocked(speed_input.parse().unwrap_or(1))
+                            }
+                            _ => {}
+                        }
+                        ui.input_text(hash!(), "Speed", &mut speed_input);
                     });
                 //root_ui().pop_skin();
             }
@@ -163,6 +228,21 @@ async fn main() {
 
         next_frame().await
     }
+}
+
+fn simulate_step<O: BitOrder, T: BitStore>(
+    fresh: &BitSlice<O, T>,
+    stale: &mut BitSlice<O, T>,
+    change_buffer: &mut BitVec<O, T>,
+    size: (usize, usize),
+    machine: &LifeLike,
+) {
+    // empty the change buffer and fill it with the new changes
+    change_buffer.clear();
+    change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
+
+    // run the simulation one step
+    machine.update(fresh, stale, &change_buffer, size);
 }
 
 fn fill_random<O: BitOrder, T: BitStore>(slice: &mut BitSlice<O, T>, rng: &mut impl Rng) {
