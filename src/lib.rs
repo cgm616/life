@@ -1,8 +1,4 @@
-use std::{
-    convert::TryFrom,
-    iter::FromIterator,
-    ops::{Deref, DerefMut},
-};
+#![allow(dead_code)]
 
 use bitvec::prelude::*;
 
@@ -135,19 +131,9 @@ pub struct ConwaysLife;
 impl ConwaysLife {
     pub fn simulate_with_logic(status: bool, alive_neighbors: usize) -> bool {
         if status {
-            if alive_neighbors < 2 {
-                false
-            } else if alive_neighbors > 3 {
-                false
-            } else {
-                true
-            }
+            (2..=3).contains(&alive_neighbors)
         } else {
-            if alive_neighbors == 3 {
-                true
-            } else {
-                false
-            }
+            alive_neighbors == 3
         }
     }
 }

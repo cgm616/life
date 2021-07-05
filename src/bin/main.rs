@@ -61,13 +61,14 @@ async fn main() {
         changes.clear();
         changes.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
 
-        render_bits(fresh, &changes, (grid_width, grid_height, resolution));
+        render_bits(
+            fresh,
+            /*&changes,*/ (grid_width, grid_height, resolution),
+        );
 
         if !is_key_down(KeyCode::Space) || is_key_released(KeyCode::Right) {
             life.update(fresh, stale, &changes, (grid_width, grid_height));
-            let temp = fresh;
-            fresh = stale;
-            stale = temp;
+            std::mem::swap(&mut fresh, &mut stale);
         }
 
         // texture.update(&image);
@@ -83,7 +84,7 @@ fn fill_random<O: BitOrder, T: BitStore>(slice: &mut BitSlice<O, T>, rng: &mut i
 
 fn render_bits<O: BitOrder, T: BitStore>(
     bits: &BitSlice<O, T>,
-    changes: &BitSlice<O, T>,
+    // changes: &BitSlice<O, T>,
     window_info: (usize, usize, usize),
 ) {
     for index in bits.iter_ones() {

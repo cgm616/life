@@ -6,7 +6,10 @@ on:
       master
 
 jobs:
-  build:
+  strategy:
+    max-parallel: 1
+  
+  setup:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,10 +22,27 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-        profile: minimal
+        profile: default
         target: wasm32-unknown-unknown
         components: rustfmt, clippy
-    
+
+  fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Rustfmt
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all -- --check
+
+  install-deps:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install build deps
+      run: sudo apt-get install libasound2-dev xorg-dev libgl1-mesa-glx
+
     - name: Install wasm-bindgen
       uses: jetli/wasm-bindgen-action@v0.1.0
       with:
@@ -33,25 +53,38 @@ jobs:
         set -e
         curl -L https://github.com/WebAssembly/binaryen/releases/download/1.39.1/binaryen-1.39.1-x86_64-linux.tar.gz | tar xzf -
         echo "`pwd`/binaryen-1.39.1" > $GITHUB_PATH
-
-    - name: Setup build deps
-      run: |
-        sudo apt-get install libasound2-dev xorg-dev libgl1-mesa-glx
+  
+  test:
+    runs-on: ubuntu-latest
     
+    steps:
     - name: Run cargo check
       uses: actions-rs/cargo@v1
       with:
         command: check
 
+    - name: Run clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: -- -D warnings
+
     - name: Run cargo test
       uses: actions-rs/cargo@v1
       with:
         command: test
+    
+  build:
+    runs-on: ubuntu-latest
 
     - name: Build and run wasm-bindgen
       run: |
         ./build_wasm.sh main --release
-      
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@releases/v3
       with:
