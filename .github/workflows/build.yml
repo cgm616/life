@@ -10,7 +10,6 @@ jobs:
   fmt-and-clippy:
     runs-on: ubuntu-latest
     env:
-      RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 2G
       SCCACHE_DIR: /home/runner/.cache/sccache
     steps:
@@ -55,6 +54,8 @@ jobs:
     - run: sccache --start-server
     - name: Rustfmt
       uses: actions-rs/cargo@v1
+      env:
+        RUSTC_WRAPPER: sccache
       with:
         command: fmt
         args: --all -- --check
