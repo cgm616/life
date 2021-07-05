@@ -9,7 +9,10 @@ on:
 jobs:
   fmt-and-clippy:
     runs-on: ubuntu-latest
-
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_CACHE_SIZE: 2G
+      SCCACHE_DIR: /home/runner/.cache/sccache
     steps:
     - uses: actions/checkout@v2
       with:
@@ -26,15 +29,50 @@ jobs:
       with:
         command: fmt
         args: --all -- --check
+    - name: Install sccache (ubuntu-latest)
+      env:
+        LINK: https://github.com/mozilla/sccache/releases/download
+        SCCACHE_VERSION: 0.2.13
+      run: |
+        SCCACHE_FILE=sccache-$SCCACHE_VERSION-x86_64-unknown-linux-musl
+        mkdir -p $HOME/.local/bin
+        curl -L "$LINK/$SCCACHE_VERSION/$SCCACHE_FILE.tar.gz" | tar xz
+        mv -f $SCCACHE_FILE/sccache $HOME/.local/bin/sccache
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    - name: Save sccache
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: ${{ matrix.sccache-path }}
+        key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sccache-
+    - run: sccache --start-server
     - name: Run clippy
       uses: actions-rs/cargo@v1
       with:
         command: clippy
         args: -- -D warnings
+    - run: sccache --show-stats
+    - run: sccache --stop-server || true
   
   test:
     runs-on: ubuntu-latest
-    
+    env:
+      RUST_BACKTRACE: full
+      RUSTC_WRAPPER: sccache
+      SCCACHE_CACHE_SIZE: 2G
+      SCCACHE_DIR: /home/runner/.cache/sccache
     steps:
     - uses: actions/checkout@v2
       with:
@@ -46,6 +84,35 @@ jobs:
         target: x86_64-unknown-linux-gnu
     - name: Install linux build deps
       run: sudo apt-get install libasound2-dev xorg-dev libgl1-mesa-glx
+    - name: Install sccache (ubuntu-latest)
+      env:
+        LINK: https://github.com/mozilla/sccache/releases/download
+        SCCACHE_VERSION: 0.2.13
+      run: |
+        SCCACHE_FILE=sccache-$SCCACHE_VERSION-x86_64-unknown-linux-musl
+        mkdir -p $HOME/.local/bin
+        curl -L "$LINK/$SCCACHE_VERSION/$SCCACHE_FILE.tar.gz" | tar xz
+        mv -f $SCCACHE_FILE/sccache $HOME/.local/bin/sccache
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    - name: Save sccache
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: ${{ matrix.sccache-path }}
+        key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sccache-
+    - run: sccache --start-server
     - name: Run cargo check
       uses: actions-rs/cargo@v1
       with:
@@ -54,11 +121,16 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
+    - run: sccache --show-stats
+    - run: sccache --stop-server || true
     
   build-and-deploy:
     needs: [fmt-and-clippy, test]
     runs-on: ubuntu-latest
-
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_CACHE_SIZE: 2G
+      SCCACHE_DIR: /home/runner/.cache/sccache
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -78,9 +150,39 @@ jobs:
         set -e
         curl -L https://github.com/WebAssembly/binaryen/releases/download/1.39.1/binaryen-1.39.1-x86_64-linux.tar.gz | tar xzf -
         echo "`pwd`/binaryen-1.39.1" > $GITHUB_PATH
-    - name: Build and run wasm-bindgen
+    - name: Install sccache (ubuntu-latest)
+      env:
+        LINK: https://github.com/mozilla/sccache/releases/download
+        SCCACHE_VERSION: 0.2.13
       run: |
-        ./build_wasm.sh main --release
+        SCCACHE_FILE=sccache-$SCCACHE_VERSION-x86_64-unknown-linux-musl
+        mkdir -p $HOME/.local/bin
+        curl -L "$LINK/$SCCACHE_VERSION/$SCCACHE_FILE.tar.gz" | tar xz
+        mv -f $SCCACHE_FILE/sccache $HOME/.local/bin/sccache
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    - name: Save sccache
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: ${{ matrix.sccache-path }}
+        key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sccache-
+    - run: sccache --start-server
+    - name: Build and run wasm-bindgen
+      run: ./build_wasm.sh main --release
+    - run: sccache --show-stats
+    - run: sccache --stop-server || true
     - name: Deploy
       uses: JamesIves/github-pages-deploy-action@releases/v3
       with:
