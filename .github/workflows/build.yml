@@ -36,7 +36,7 @@ jobs:
 
     - name: Setup build deps
       run: |
-        apt-get install libasound2-dev
+        sudo apt-get install libasound2-dev
     
     - name: Run cargo check
       uses: actions-rs/cargo@v1
