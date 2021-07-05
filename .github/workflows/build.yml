@@ -32,7 +32,6 @@ jobs:
           ubuntu-latest-cargo-
     - name: Rustfmt
       uses: actions-rs/cargo@v1
-      env:
       with:
         command: fmt
         args: --all -- --check
