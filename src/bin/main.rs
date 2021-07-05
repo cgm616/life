@@ -87,12 +87,12 @@ enum State {
 }
 
 impl State {
-    fn next(&self, input: KeyCode) -> State {
-        match (self, input) {
-            (State::Normal | State::Paused, KeyCode::Escape) => State::Settings,
-            (State::Normal, KeyCode::Space) => State::Paused,
-            (State::Settings, KeyCode::Escape) => State::Normal,
-            (State::Paused, KeyCode::Space) => State::Normal,
+    fn next(&self, input: KeyCode, touches: Vec<Touch>) -> State {
+        match (self, input, touches.len() > 0) {
+            (State::Normal | State::Paused, KeyCode::Escape, _) => State::Settings,
+            (State::Normal, KeyCode::Space, _) | (State::Normal, _, true) => State::Paused,
+            (State::Settings, KeyCode::Escape, _) => State::Normal,
+            (State::Paused, KeyCode::Space, _) | (State::Paused, _, true) => State::Normal,
             _ => *self,
         }
     }
@@ -135,7 +135,7 @@ async fn main() {
         // process possible state changes
         match get_last_key_pressed() {
             Some(KeyCode::N) => fill_random(fresh, &mut rng),
-            Some(input) => world.state = world.state.next(input),
+            Some(input) => world.state = world.state.next(input, touches()),
             None => {}
         }
 
