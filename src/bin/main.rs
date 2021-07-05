@@ -32,9 +32,6 @@ async fn main() {
     let grid_height = height / resolution;
     let grid_width = width / resolution;
 
-    info!("screen size: {} x {}", width, height);
-    info!("grid size: {} x {}", grid_width, grid_height);
-
     // let mut world1: BitArr!(for grid_height * grid_width) = bitarr![0; grid_height * grid_width];
     // let mut world2: BitArr!(for grid_height * grid_width) = bitarr![0; grid_height * grid_width];
 

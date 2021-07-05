@@ -16,4 +16,5 @@ rand = "0.8.4"
 proptest = "1.0.0"
 
 [profile.release]
-debug = true
+lto = true
+opt-level = 's'

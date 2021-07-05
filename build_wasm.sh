@@ -85,7 +85,16 @@ cargo build --target wasm32-unknown-unknown $EXTRA_ARGS
 mkdir -p web/wbindgen
 wasm-bindgen --target web --out-dir web/wbindgen/ target/wasm32-unknown-unknown/release/$PROJECT_NAME.wasm
 
-# Shim to tie the thing together
-sed -i '' -e "s/import \* as __wbg_star0 from 'env';//" ./web/wbindgen/$PROJECT_NAME.js
-sed -i '' -e "s/let wasm;/let wasm; export const set_wasm = (w) => wasm = w;/" ./web/wbindgen/$PROJECT_NAME.js
-sed -i '' -e "s/imports\['env'\] = __wbg_star0;/return imports.wbg\;/" ./web/wbindgen/$PROJECT_NAME.js
+# Optimize for size
+wasm-opt -Os -o web/wbindgen/main_bg.wasm web/wbindgen/main_bg.wasm
+
+# Shims to tie it all together
+if type "gsed" > /dev/null; then
+    gsed -i "s/import \* as __wbg_star0 from 'env';//" ./web/wbindgen/$PROJECT_NAME.js
+    gsed -i "s/let wasm;/let wasm; export const set_wasm = (w) => wasm = w;/" ./web/wbindgen/$PROJECT_NAME.js
+    gsed -i "s/imports\['env'\] = __wbg_star0;/return imports.wbg\;/" ./web/wbindgen/$PROJECT_NAME.js
+else
+    sed -i "s/import \* as __wbg_star0 from 'env';//" ./web/wbindgen/$PROJECT_NAME.js
+    sed -i "s/let wasm;/let wasm; export const set_wasm = (w) => wasm = w;/" ./web/wbindgen/$PROJECT_NAME.js
+    sed -i "s/imports\['env'\] = __wbg_star0;/return imports.wbg\;/" ./web/wbindgen/$PROJECT_NAME.js
+fi
