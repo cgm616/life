@@ -214,7 +214,7 @@ mod test {
 
     #[test]
     fn conways_life_compiles() {
-        let life = LifeLike::new("B3/S23").unwrap();
+        let _life = LifeLike::new("B3/S23").unwrap();
     }
 
     proptest! {

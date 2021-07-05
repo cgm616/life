@@ -4,13 +4,14 @@ use chips::{Automata, LifeLike};
 
 use ::rand::{thread_rng, Rng};
 use bitvec::prelude::*;
-use macroquad::prelude::*;
+use macroquad::{
+    prelude::*,
+    ui::{hash, root_ui, widgets, Skin},
+};
 
 const HEIGHT: usize = 512;
 const WIDTH: usize = 1024;
-// const RESOLUTION: usize = 8;
-// const M_HEIGHT: usize = HEIGHT / RESOLUTION;
-// const M_WIDTH: usize = WIDTH / RESOLUTION;
+const INITIAL_RULE: &str = "B3/S23";
 
 fn window_conf() -> Conf {
     Conf {
@@ -18,7 +19,52 @@ fn window_conf() -> Conf {
         window_width: WIDTH as i32,
         window_height: HEIGHT as i32,
         window_resizable: false,
+        high_dpi: false,
         ..Default::default()
+    }
+}
+
+struct World {
+    state: State,
+    machine: LifeLike,
+    /// The speed of the simulation. Positive numbers mean that the simulation should
+    /// process multiple generations a frame and negative numbers mean that the simulation
+    /// should process a generation every couple of frames.
+    speed: isize,
+}
+
+impl World {
+    fn new(initial_rule: &str) -> Self {
+        World {
+            state: State::Normal,
+            machine: LifeLike::new(initial_rule).unwrap(),
+            speed: 1,
+        }
+    }
+
+    fn new_rule(&mut self, new: &str) -> Result<(), &'static str> {
+        self.machine = LifeLike::new(&new.trim())?;
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum State {
+    /// The main state of the simulation. The machine should simulate
+    Normal,
+    Paused,
+    Settings,
+}
+
+impl State {
+    fn next(&self, input: KeyCode) -> State {
+        match (self, input) {
+            (State::Normal | State::Paused, KeyCode::Escape) => State::Settings,
+            (State::Normal, KeyCode::Space) => State::Paused,
+            (State::Settings, KeyCode::Escape) => State::Normal,
+            (State::Paused, KeyCode::Space) => State::Normal,
+            _ => *self,
+        }
     }
 }
 
@@ -31,48 +77,87 @@ async fn main() {
     let resolution = 8usize;
     let grid_height = height / resolution;
     let grid_width = width / resolution;
+    let world_size = grid_height * grid_width;
 
-    // let mut world1: BitArr!(for grid_height * grid_width) = bitarr![0; grid_height * grid_width];
-    // let mut world2: BitArr!(for grid_height * grid_width) = bitarr![0; grid_height * grid_width];
+    let mut buffer1: BitVec<Lsb0, usize> = BitVec::with_capacity(world_size);
+    let mut buffer2: BitVec<Lsb0, usize> = BitVec::with_capacity(world_size);
+    let mut change_buffer: BitVec<Lsb0, usize> = BitVec::with_capacity(world_size);
+    buffer1.resize(world_size, false);
+    buffer2.resize(world_size, false);
+    change_buffer.resize(world_size, false);
 
-    let mut world1: BitVec<Lsb0, usize> = BitVec::with_capacity(grid_width * grid_height);
-    let mut world2: BitVec<Lsb0, usize> = BitVec::with_capacity(grid_width * grid_height);
-    let mut changes: BitVec<Lsb0, usize> = BitVec::with_capacity(grid_width * grid_height);
-    world1.resize(grid_width * grid_height, false);
-    world2.resize(grid_width * grid_height, false);
-    changes.resize(grid_width * grid_height, false);
+    fill_random(&mut buffer1, &mut rng);
 
-    fill_random(&mut world1, &mut rng);
+    let (mut fresh, mut stale) = (&mut buffer1, &mut buffer2);
 
-    let (mut fresh, mut stale) = (&mut world1, &mut world2);
+    // let skin = make_skin();
 
-    // let mut image = Image::gen_image_color(width as u16, height as u16, BLACK);
-    // let texture = Texture2D::from_image(&image);
-
-    let life = LifeLike::new("B4678/S35678").unwrap();
+    let mut world = World::new(INITIAL_RULE);
+    let mut rule_input = INITIAL_RULE.to_owned();
 
     loop {
-        clear_background(BLACK);
+        clear_background(BLACK); // clear all previous drawings
 
-        if is_key_released(KeyCode::Enter) {
-            fill_random(fresh, &mut rng);
+        // render the fresh information
+        render_bits(fresh, (grid_width, grid_height, resolution));
+
+        // process possible state changes
+        match get_last_key_pressed() {
+            Some(KeyCode::N) => fill_random(fresh, &mut rng),
+            Some(input) => world.state = world.state.next(input),
+            None => {}
         }
 
-        changes.clear();
-        changes.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
+        // proceed according to current state
+        match world.state {
+            State::Normal => {
+                // empty the change buffer and fill it with the new changes
+                change_buffer.clear();
+                change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
 
-        render_bits(
-            fresh,
-            /*&changes,*/ (grid_width, grid_height, resolution),
-        );
+                // run the simulation one step
+                // TODO: implement speed
+                world
+                    .machine
+                    .update(fresh, stale, &change_buffer, (grid_width, grid_height));
 
-        if !is_key_down(KeyCode::Space) || is_key_released(KeyCode::Right) {
-            life.update(fresh, stale, &changes, (grid_width, grid_height));
-            std::mem::swap(&mut fresh, &mut stale);
+                // swap the references
+                std::mem::swap(&mut fresh, &mut stale);
+            }
+            State::Paused => {
+                // if paused, don't do anything unless the right arrow key was pressed
+                if is_key_pressed(KeyCode::Right) {
+                    // empty the change buffer and fill it with the new changes
+                    change_buffer.clear();
+                    change_buffer.extend(fresh.iter().zip(stale.iter()).map(|(a, b)| *a ^ *b));
+
+                    // run the simulation one step
+                    // TODO: implement speed
+                    world
+                        .machine
+                        .update(fresh, stale, &change_buffer, (grid_width, grid_height));
+
+                    // swap the references
+                    std::mem::swap(&mut fresh, &mut stale);
+                }
+            }
+            State::Settings => {
+                //root_ui().push_skin(&skin);
+                widgets::Window::new(hash!(), vec2(20., 20.), vec2(300., 100.))
+                    .movable(true)
+                    .label("Settings")
+                    .ui(&mut root_ui(), |ui| {
+                        ui.input_text(hash!(), "Rule", &mut rule_input);
+                        if ui.button(None, "Update rule") {
+                            match world.new_rule(&rule_input) {
+                                Ok(()) => info!("changed rule to {}", rule_input.trim()),
+                                Err(e) => error!("could not change rule! error:\n  {}", e),
+                            }
+                        }
+                    });
+                //root_ui().pop_skin();
+            }
         }
-
-        // texture.update(&image);
-        // draw_texture(texture, 0.0, 0.0, WHITE);
 
         next_frame().await
     }
@@ -106,3 +191,53 @@ fn render_bits<O: BitOrder, T: BitStore>(
         );
     }
 }
+
+//const FONT: &[u8; 124236] = include_bytes!("../../assets/font/Rubik-Regular.ttf");
+/*
+fn make_skin() -> Skin {
+    let label_style = root_ui()
+        .style_builder()
+        .font(FONT)
+        .unwrap()
+        .text_color(Color::from_rgba(255, 255, 255, 255))
+        .font_size(20)
+        .build();
+
+    let window_style = root_ui()
+        .style_builder()
+        .background_margin(RectOffset::new(10.0, 10.0, 10.0, 10.0))
+        .color(Color::from_rgba(255, 255, 255, 150))
+        .font(FONT)
+        .unwrap()
+        .text_color(Color::from_rgba(255, 255, 255, 255))
+        .font_size(20)
+        .build();
+
+    let button_style = root_ui()
+        .style_builder()
+        .margin(RectOffset::new(10.0, 10.0, 10.0, 10.0))
+        .font(FONT)
+        .unwrap()
+        .text_color(Color::from_rgba(255, 255, 255, 255))
+        .font_size(20)
+        .build();
+
+    let editbox_style = root_ui()
+        .style_builder()
+        .margin(RectOffset::new(20., 20., 20., 20.))
+        .background_margin(RectOffset::new(0., 0., 0., 0.))
+        .font(FONT)
+        .unwrap()
+        .text_color(Color::from_rgba(0, 0, 0, 255))
+        .color_selected(Color::from_rgba(190, 190, 190, 255))
+        .font_size(20)
+        .build();
+
+    Skin {
+        editbox_style,
+        window_style,
+        button_style,
+        label_style,
+        ..root_ui().default_skin()
+    }
+*/
