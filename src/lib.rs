@@ -2,6 +2,8 @@
 
 use bitvec::prelude::*;
 
+pub mod pattern;
+
 pub trait Automata {
     fn update<O: BitOrder, T: BitStore>(
         &self,

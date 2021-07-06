@@ -2,11 +2,12 @@
 
 use core::f32;
 
-use life::{Automata, LifeLike};
+use life::{pattern::Pattern, Automata, LifeLike};
 
 use ::rand::{thread_rng, Rng};
 use bitvec::prelude::*;
 use macroquad::{
+    file::{load_string, set_pc_assets_folder},
     prelude::*,
     ui::{hash, root_ui, widgets},
 };
@@ -100,6 +101,12 @@ impl State {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    set_pc_assets_folder("assets");
+
+    #[cfg(target_arch = "wasm32")]
+    set_pc_assets_folder("");
+
     let mut rng = thread_rng();
 
     let height: usize = screen_height() as usize;
@@ -116,7 +123,24 @@ async fn main() {
     buffer2.resize(world_size, false);
     change_buffer.resize(world_size, false);
 
-    fill_random(&mut buffer1, &mut rng);
+    // fill_random(&mut buffer1, &mut rng);
+    let pattern: Pattern = Pattern::from_plaintext(
+        load_string("pattern/gosper_glider_gun.cells")
+            .await
+            .unwrap()
+            .lines(),
+    )
+    .unwrap();
+
+    pattern
+        .place(
+            &mut buffer1,
+            (grid_width, grid_height),
+            pattern
+                .calc_midpoint_placement((grid_width, grid_height))
+                .unwrap(),
+        )
+        .unwrap();
 
     let (mut fresh, mut stale) = (&mut *buffer1, &mut *buffer2);
 
