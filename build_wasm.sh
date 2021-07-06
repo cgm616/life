@@ -100,12 +100,13 @@ if [ "$MINIFY" == "yes" ]; then
 fi
 
 # Shims to tie it all together
-echo "Finishing up..."
 if type "gsed" > /dev/null; then
+    echo "Finishing up..."
     gsed -i "s/import \* as __wbg_star0 from 'env';//" ./web/wbindgen/$PROJECT_NAME.js
     gsed -i "s/let wasm;/let wasm; export const set_wasm = (w) => wasm = w;/" ./web/wbindgen/$PROJECT_NAME.js
     gsed -i "s/imports\['env'\] = __wbg_star0;/return imports.wbg\;/" ./web/wbindgen/$PROJECT_NAME.js
 else
+    echo "Finishing up..."
     sed -i "s/import \* as __wbg_star0 from 'env';//" ./web/wbindgen/$PROJECT_NAME.js
     sed -i "s/let wasm;/let wasm; export const set_wasm = (w) => wasm = w;/" ./web/wbindgen/$PROJECT_NAME.js
     sed -i "s/imports\['env'\] = __wbg_star0;/return imports.wbg\;/" ./web/wbindgen/$PROJECT_NAME.js

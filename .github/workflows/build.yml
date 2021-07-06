@@ -157,7 +157,7 @@ jobs:
     - run: rm -rf ./web/
     - name: Build and run wasm-bindgen
       run: ./build_wasm.sh main --release --minify
-    - run: cp -a ./assets/ ./web
+    - run: cp -a ./assets/. ./web
     - run: sccache --show-stats
     - run: sccache --stop-server || true
     - name: Deploy
