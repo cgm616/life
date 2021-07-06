@@ -1,2 +1,3 @@
 /target
-/web/wbindgen
+/web
+.DS_Store

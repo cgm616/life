@@ -6,8 +6,10 @@ clippy: src/
 
 check: fmt clippy
 
-run: src/
+run: src/ assets/
 	cargo run --release --bin main
 
-wasm: src/
-	./build-wasm.sh main --release
+wasm: src/ assets/
+	rm -rf ./web
+	./build_wasm.sh main --release
+	cp -a ./assets/ ./web
