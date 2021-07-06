@@ -151,8 +151,8 @@ fn moore_neighborhood_wrapping(cell: (usize, usize), size: (usize, usize)) -> [(
             (cell.0 - 1, cell.1),
         ]
     } else {
-        let early_column = size.0 - 1;
-        let early_row = size.1 - 1;
+        let early_column = if cell.0 == 0 { size.0 - 1 } else { cell.0 - 1 };
+        let early_row = if cell.1 == 0 { size.1 - 1 } else { cell.1 - 1 };
         [
             (early_column, early_row),
             (cell.0, early_row),
@@ -239,6 +239,38 @@ mod test {
         fn pt_lifelike_index_reversible(neighbors in 0usize..9) {
             prop_assert_eq!((true, neighbors & 0b1111), LifeLike::decode_index(LifeLike::encode_index(true, neighbors)));
             prop_assert_eq!((false, neighbors & 0b1111), LifeLike::decode_index(LifeLike::encode_index(false, neighbors)));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn pt_moore_neighborhood_wrapping(width in 3usize..1000, height in 3usize..1000) {
+            let size = (width, height);
+            let cell = (width - 1, height - 1);
+            prop_assert_eq!(
+                [(cell.0 - 1, cell.1 - 1),
+                 (cell.0, cell.1-1),
+                 (0, cell.1 - 1),
+                 (0, cell.1),
+                 (0, 0),
+                 (cell.0, 0),
+                 (cell.0 - 1, 0),
+                 (cell.0 - 1, cell.1)],
+                 moore_neighborhood_wrapping(cell, size)
+            );
+
+            let cell = (0, height - 1);
+            prop_assert_eq!(
+                [(width - 1, cell.1 - 1),
+                 (cell.0, cell.1-1),
+                 (cell.0 + 1, cell.1 - 1),
+                 (cell.0 + 1, cell.1),
+                 (cell.0 + 1, 0),
+                 (cell.0, 0),
+                 (width - 1, 0),
+                 (width - 1, cell.1)],
+                 moore_neighborhood_wrapping(cell, size)
+            );
         }
     }
 }
