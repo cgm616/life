@@ -1,6 +1,6 @@
 use life::{ConwaysLife, LifeLike};
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let machine = LifeLike::new("B3/S23").unwrap();

@@ -19,6 +19,7 @@ proptest = "1.0.0"
 [profile.release]
 lto = true
 opt-level = 's'
+debug = 1
 
 [[bench]]
 name = "life_like"
@@ -26,4 +27,12 @@ harness = false
 
 [[bench]]
 name = "logic_vs_lookup"
+harness = false
+
+[[bench]]
+name = "moore_neighborhood"
+harness = false
+
+[[bench]]
+name = "changes"
 harness = false

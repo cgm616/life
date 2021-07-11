@@ -138,7 +138,10 @@ impl ConwaysLife {
     }
 }
 
-fn moore_neighborhood_wrapping(cell: (usize, usize), size: (usize, usize)) -> [(usize, usize); 8] {
+pub fn moore_neighborhood_wrapping(
+    cell: (usize, usize),
+    size: (usize, usize),
+) -> [(usize, usize); 8] {
     if cell.0 != 0 && cell.1 != 0 {
         [
             (cell.0 - 1, cell.1 - 1),
