@@ -74,7 +74,7 @@ impl World {
     }
 
     fn new_rule(&mut self, new: &str) -> Result<(), &'static str> {
-        self.machine = LifeLike::new(&new.trim())?;
+        self.machine = LifeLike::new(new.trim())?;
         Ok(())
     }
 }
@@ -272,7 +272,7 @@ fn simulate_step<O: BitOrder>(
     );
 
     // run the simulation one step
-    machine.update(fresh, stale, &change_buffer, size);
+    machine.update(fresh, stale, change_buffer, size);
 }
 
 fn fill_random<O: BitOrder, T: BitStore>(slice: &mut BitSlice<O, T>, rng: &mut impl Rng) {
