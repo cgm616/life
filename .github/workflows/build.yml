@@ -7,7 +7,7 @@ on:
     types:
       - completed
 
-    
+jobs:
   build-and-deploy:
     needs: [fmt-and-clippy, test]
     runs-on: ubuntu-latest
