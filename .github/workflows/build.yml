@@ -1,106 +1,17 @@
-name: build-test-deploy
+name: Build and deploy wasm app
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
+  workflow_run:
+    workflows: ["Run tests and checks"]
+    branches: [master]
+    types:
+      - completed
 
-jobs:
-  fmt-and-clippy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        persist-credentials: false
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        components: rustfmt, clippy
-    - name: Install linux build deps
-      run: sudo apt-get install libasound2-dev xorg-dev libgl1-mesa-glx
-    - name: Cache cargo registry
-      uses: actions/cache@v2
-      continue-on-error: false
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ubuntu-latest-cargo-
-    - name: Rustfmt
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all -- --check
-    - name: Run clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: -- -D warnings
-  
-  test:
-    runs-on: ubuntu-latest
-    env:
-      RUST_BACKTRACE: full
-      RUSTC_WRAPPER: sccache
-      SCCACHE_CACHE_SIZE: 2G
-      SCCACHE_DIR: /home/runner/.cache/sccache
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        persist-credentials: false
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        target: x86_64-unknown-linux-gnu
-    - name: Install linux build deps
-      run: sudo apt-get install libasound2-dev xorg-dev libgl1-mesa-glx
-    - name: Install sccache (ubuntu-latest)
-      env:
-        LINK: https://github.com/mozilla/sccache/releases/download
-        SCCACHE_VERSION: 0.2.13
-      run: |
-        SCCACHE_FILE=sccache-$SCCACHE_VERSION-x86_64-unknown-linux-musl
-        mkdir -p $HOME/.local/bin
-        curl -L "$LINK/$SCCACHE_VERSION/$SCCACHE_FILE.tar.gz" | tar xz
-        mv -f $SCCACHE_FILE/sccache $HOME/.local/bin/sccache
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-    - name: Cache cargo registry
-      uses: actions/cache@v2
-      continue-on-error: false
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ubuntu-latest-cargo-
-    - name: Save sccache
-      uses: actions/cache@v2
-      continue-on-error: false
-      with:
-        path: /home/runner/.cache/sccache
-        key: ubuntu-latest-sccache-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ubuntu-latest-sccache-
-    - run: sccache --start-server
-    - name: Run cargo check
-      uses: actions-rs/cargo@v1
-      with:
-        command: check
-    - name: Run cargo test
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-    - run: sccache --show-stats
-    - run: sccache --stop-server || true
     
   build-and-deploy:
     needs: [fmt-and-clippy, test]
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     env:
       RUSTC_WRAPPER: sccache
       SCCACHE_CACHE_SIZE: 2G
